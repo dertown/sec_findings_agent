@@ -1,0 +1,76 @@
+<form version="1.1" theme="dark" stylesheet="dashboard.css">
+  <label>Scoring model</label>
+  <description>How evidence is weighted and how the 0-100 follow-up score is produced. Tune thresholds with command options or local/es_finding_evidence.conf.</description>
+  <row>
+    <panel>
+      <html>
+        <div class="fea-help">
+          <h2>Follow-up score</h2>
+          <p>Each finding gets a score from <b>0 to 100</b>. The score answers: should an analyst follow up?</p>
+          <ul>
+            <li><b>0–29 No</b> — likely false/benign; do not open an investigation.</li>
+            <li><b>30–49 Review</b> — glance at the evidence and the recommended searches.</li>
+            <li><b>50–100 Yes</b> — investigation required. Higher scores should be handled first.</li>
+          </ul>
+          <h2>Mix</h2>
+          <p>Score = 22% urgency + 18% risk + 22% observed evidence + 18% triage disposition + 10% kill-chain phase + 10% corroboration.</p>
+          <p>Observed evidence starts at 50 (neutral) and moves up or down as supporting or refuting items are attached. Unrun recommended searches never inflate the live score; they only raise the <i>ceiling</i> shown on the workbench.</p>
+          <h2>Triage agent</h2>
+          <p>ES 8.6 Triage agent fields (summary, justification, tools, evidence, analysis details, recommended disposition) are parsed from finding fields or notes. True-positive recommendations raise the score; high-confidence false/benign recommendations lower it and can force a No decision unless urgency is critical.</p>
+        </div>
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Decision mix on demo findings</title>
+      <chart>
+        <search>
+          <query>| loadfindings mode=demo | stats count by investigation_required</query>
+        </search>
+        <option name="charting.chart">pie</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Follow-up score vs triage disposition</title>
+      <chart>
+        <search>
+          <query>| loadfindings mode=demo | eval triage_disposition=if(triage_present=0,"not_run",triage_disposition) | chart median(followup_score) as median_score by triage_disposition</query>
+        </search>
+        <option name="charting.chart">bar</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Demo findings with score components</title>
+      <table>
+        <search>
+          <query>| loadfindings mode=demo | sort - followup_score | table followup_score, investigation_required, finding_id, title, urgency, risk_score, triage_disposition, evidence_net_weight, score_breakdown_json</query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="count">20</option>
+        <option name="drilldown">none</option>
+        <format type="color" field="followup_score">
+          <colorPalette type="list">[#53a051,#f8be34,#f1813f,#dc4e41]</colorPalette>
+          <scale type="threshold">30,50,75</scale>
+        </format>
+        <format type="color" field="investigation_required">
+          <colorPalette type="map">{"Yes":#dc4e41,"Review":#f8be34,"No":#53a051}</colorPalette>
+        </format>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Evidence class catalog (built-in weights)</title>
+      <table>
+        <search>
+          <query>| inputlookup evidence_weights.csv | sort - base_weight</query>
+        </search>
+        <option name="count">50</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+</form>

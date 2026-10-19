@@ -1,0 +1,13 @@
+finding_id,title,urgency,user,src,dest,risk_score,triage_disposition
+F-1001,Credential dumping detected on domain controller,critical,admin.rjones,dc01.corp.local,dc01.corp.local,95,True Positive - Suspicious Activity
+F-1002,Multiple failed logons followed by success,high,svc-backup,203.0.113.44,filesrv01.corp.local,72,True Positive - Suspicious Activity
+F-1003,Vulnerability scanner hitting internal web farms,medium,svc-qualys,qualys-scanner.corp.local,web01.corp.local,30,Benign Positive - Suspicious But Expected
+F-1004,Encoded PowerShell via rundll32,high,j.smith,workstation-88.corp.local,workstation-88.corp.local,81,True Positive - Suspicious Activity
+F-1005,Known-good software hash on endpoint,low,p.patel,laptop-12.corp.local,,18,False Positive - Incorrect Analytic Logic
+F-1006,Periodic connections to rare external IP,high,m.garcia,finance-07.corp.local,198.51.100.77,77,True Positive - Suspicious Activity
+F-1007,Impossible travel for executive,medium,c.okonkwo,203.0.113.9,,54,Other
+F-1008,Malicious attachment hash in email,high,finance@corp.local,,,84,True Positive - Suspicious Activity
+F-1009,DNS to newly registered domain,medium,a.chen,workstation-22.corp.local,cdn-stat-metrics.xyz,41,Undetermined
+F-1010,PsExec from jump host by server admin,medium,svc-admin,jump-01.corp.local,app-14.corp.local,36,Benign Positive - Suspicious But Expected
+F-1011,Large outbound transfer from file server,critical,svc-backup,filesrv01.corp.local,s3-external.example.org,99,True Positive - Suspicious Activity
+F-1012,Basic port scan from DHCP client,informational,guest-wifi,10.20.9.40,10.20.9.41,8,

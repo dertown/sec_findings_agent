@@ -1,0 +1,13 @@
+.fea-help {
+  color: #d5dce6;
+  padding: 8px 16px 16px 16px;
+  max-width: 1100px;
+  line-height: 1.45;
+}
+.fea-help h2 {
+  color: #7ec8e3;
+  margin-top: 16px;
+}
+.fea-help b {
+  color: #ffffff;
+}

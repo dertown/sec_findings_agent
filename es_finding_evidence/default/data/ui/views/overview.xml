@@ -1,0 +1,124 @@
+<form version="1.1" theme="dark" stylesheet="dashboard.css">
+  <label>Follow-up queue</label>
+  <description>Enterprise Security findings scored with Triage agent enrichment. Use Demo data to explore without ES, or ES API to read live findings.</description>
+  <fieldset submitButton="true" autoRun="true">
+    <input type="dropdown" token="mode" searchWhenChanged="true">
+      <label>Data source</label>
+      <choice value="demo">Demo findings</choice>
+      <choice value="rest">ES Mission Control API</choice>
+      <choice value="auto">Auto (ES, then demo)</choice>
+      <default>demo</default>
+      <initialValue>demo</initialValue>
+    </input>
+    <input type="dropdown" token="decision" searchWhenChanged="true">
+      <label>Investigation decision</label>
+      <choice value="*">All</choice>
+      <choice value="Yes">Investigation required</choice>
+      <choice value="Review">Analyst review</choice>
+      <choice value="No">No follow-up</choice>
+      <default>*</default>
+    </input>
+    <input type="text" token="limit">
+      <label>Finding limit</label>
+      <default>50</default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <single>
+        <title>Investigation required</title>
+        <search>
+          <query>| loadfindings mode=$mode$ limit=$limit$ | where match(investigation_required,"$decision$") | stats count(eval(investigation_required="Yes")) as count</query>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[1,5]</option>
+        <option name="underLabel">YES</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>Analyst review</title>
+        <search>
+          <query>| loadfindings mode=$mode$ limit=$limit$ | where match(investigation_required,"$decision$") | stats count(eval(investigation_required="Review")) as count</query>
+        </search>
+        <option name="underLabel">REVIEW</option>
+        <option name="colorBy">value</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xf1813f"]</option>
+        <option name="rangeValues">[1,5]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>No follow-up</title>
+        <search>
+          <query>| loadfindings mode=$mode$ limit=$limit$ | where match(investigation_required,"$decision$") | stats count(eval(investigation_required="No")) as count</query>
+        </search>
+        <option name="underLabel">NO</option>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>Average follow-up score</title>
+        <search>
+          <query>| loadfindings mode=$mode$ limit=$limit$ | where match(investigation_required,"$decision$") | stats avg(followup_score) as score | eval score=round(score,1)</query>
+        </search>
+        <option name="underLabel">0-100</option>
+        <option name="colorBy">value</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[30,50]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>Follow-up score distribution</title>
+        <search>
+          <query>| loadfindings mode=$mode$ limit=$limit$ | where match(investigation_required,"$decision$") | eval bucket=case(followup_score&lt;30,"0-29",followup_score&lt;50,"30-49",followup_score&lt;75,"50-74",true(),"75-100") | stats count by bucket | sort bucket</query>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.axisTitleX.text">Score band</option>
+        <option name="charting.axisTitleY.text">Findings</option>
+        <option name="charting.fieldColors">{"count":#5BA3D9}</option>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>Triage agent dispositions</title>
+        <search>
+          <query>| loadfindings mode=$mode$ limit=$limit$ | where match(investigation_required,"$decision$") | eval triage_disposition=if(triage_present=0,"not_run",triage_disposition) | stats count by triage_disposition</query>
+        </search>
+        <option name="charting.chart">pie</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>Scored findings — click a row to open the workbench</title>
+        <search>
+          <query>| loadfindings mode=$mode$ limit=$limit$ | where match(investigation_required,"$decision$") | sort - followup_score | table followup_score, investigation_required, finding_id, title, urgency, triage_disposition, triage_confidence, evidence_net_weight, recommended_search_count, owner, status, user, src, dest</query>
+        </search>
+        <option name="count">20</option>
+        <option name="drilldown">row</option>
+        <option name="wrap">true</option>
+        <format type="color" field="followup_score">
+          <colorPalette type="list">[#53a051,#f8be34,#f1813f,#dc4e41]</colorPalette>
+          <scale type="threshold">30,50,75</scale>
+        </format>
+        <format type="color" field="investigation_required">
+          <colorPalette type="map">{"Yes":#dc4e41,"Review":#f8be34,"No":#53a051}</colorPalette>
+        </format>
+        <drilldown>
+          <link target="_blank">
+            <![CDATA[/app/es_finding_evidence/finding_workbench?form.finding_id=$row.finding_id$&form.mode=$mode$]]>
+          </link>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+</form>

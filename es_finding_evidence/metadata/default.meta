@@ -1,0 +1,27 @@
+[]
+access = read : [ * ], write : [ admin, ess_admin, es_finding_evidence_analyst ]
+export = system
+
+[views]
+access = read : [ * ], write : [ admin, ess_admin ]
+export = system
+
+[savedsearches]
+access = read : [ * ], write : [ admin, ess_admin ]
+export = system
+
+[macros]
+export = system
+
+[commands]
+export = system
+
+[lookups]
+export = system
+
+[transforms]
+export = system
+
+[collections/finding_evidence_scores]
+access = read : [ * ], write : [ admin, ess_admin, ess_analyst, es_finding_evidence_analyst ]
+export = system

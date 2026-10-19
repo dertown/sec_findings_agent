@@ -1,0 +1,22 @@
+class,source,direction,base_weight,description
+c2_beacon,finding_metadata,supporting,88,c2 beacon
+credential_access,finding_metadata,supporting,84,credential access
+critical_asset,asset_identity,supporting,78,critical asset
+exfiltration,finding_metadata,supporting,90,exfiltration
+high_risk_score,finding_metadata,supporting,72,high risk score
+high_urgency,finding_metadata,supporting,68,high urgency
+known_scanner,finding_metadata,refuting,60,known scanner
+lateral_movement,finding_metadata,supporting,82,lateral movement
+low_confidence_detection,finding_metadata,refuting,28,low confidence detection
+malware_hash,threat_intel,supporting,95,malware hash
+privileged_account,asset_identity,supporting,80,privileged account
+related_findings,related_findings,supporting,70,related findings
+sanctioned_admin,finding_metadata,refuting,52,sanctioned admin
+soar_clean,soar_connector,refuting,55,soar clean
+soar_malicious,soar_connector,supporting,82,soar malicious
+threat_intel_match,threat_intel,supporting,90,threat intel match
+triage_benign,triage_agent,refuting,62,triage benign
+triage_evidence,triage_agent,supporting,58,triage evidence
+triage_false_positive,triage_agent,refuting,70,triage false positive
+triage_narrative,triage_agent,supporting,48,triage narrative
+triage_true_positive,triage_agent,supporting,86,triage true positive
