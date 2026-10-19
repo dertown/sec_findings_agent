@@ -339,7 +339,8 @@ class DashboardXmlTests(unittest.TestCase):
         for name in ("judge_manager.xml", "agent_ops.xml", "finding_workbench.xml", "overview.xml"):
             parse(os.path.join(views, name))
             if name == "overview.xml":
-                text = open(os.path.join(views, name), encoding="utf-8").read()
+                with open(os.path.join(views, name), encoding="utf-8") as handle:
+                    text = handle.read()
                 self.assertNotIn('match(investigation_required,"$decision$")', text)
                 self.assertIn('"$decision$"="*" OR investigation_required="$decision$"', text)
 
