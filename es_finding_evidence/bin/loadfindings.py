@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lib.analyze import analyze_records, demo_records
 from lib.chunked import ChunkedCommand, option, option_float, option_int
 from lib.constants import DEFAULT_WINDOW_MINUTES, INVESTIGATE_THRESHOLD, REVIEW_THRESHOLD
+from lib.demo import is_demo_finding_id
 
 
 class LoadFindingsCommand(ChunkedCommand):
@@ -37,7 +38,7 @@ class LoadFindingsCommand(ChunkedCommand):
         limit = option_int(self.options, "limit", 100)
 
         records = []
-        if mode in {"demo", "sample"}:
+        if mode in {"demo", "sample"} or is_demo_finding_id(finding_id):
             records = demo_records()
         else:
             records = self._from_es(finding_id, include_notes, limit)

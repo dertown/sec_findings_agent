@@ -451,3 +451,13 @@ def sample_findings(now: float | None = None) -> list[dict[str, Any]]:
 
 def sample_now() -> float:
     return NOW
+
+
+def demo_finding_ids() -> set[str]:
+    return {str(row.get("finding_id")) for row in sample_findings()}
+
+
+def is_demo_finding_id(finding_id: str | None) -> bool:
+    """True for bundled sample ids such as F-1001. Those are not ES Mission Control ids."""
+    text = str(finding_id or "").strip()
+    return bool(text) and text in demo_finding_ids()

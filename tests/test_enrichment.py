@@ -14,7 +14,8 @@ sys.path.insert(0, ROOT)
 
 from lib.agent import FindingEvidenceAgent  # noqa: E402
 from lib.enrichment import ENRICHMENT_MARKER, build_enrichment, build_note, compact_fields  # noqa: E402
-from lib.es_client import ESClient  # noqa: E402
+from lib.demo import is_demo_finding_id  # noqa: E402
+from lib.es_client import ESClient, ESClientError  # noqa: E402
 from lib.judge_store import (  # noqa: E402
     delete_python_file,
     merge_kv_judges,
@@ -343,6 +344,52 @@ class DashboardXmlTests(unittest.TestCase):
                     text = handle.read()
                 self.assertNotIn('match(investigation_required,"$decision$")', text)
                 self.assertIn('"$decision$"="*" OR investigation_required="$decision$"', text)
+
+
+class DemoFindingLookupTests(unittest.TestCase):
+    def test_sample_ids(self):
+        self.assertTrue(is_demo_finding_id("F-1001"))
+        self.assertTrue(is_demo_finding_id("F-1012"))
+        self.assertFalse(is_demo_finding_id(""))
+        self.assertFalse(is_demo_finding_id("a1b2c3d4-e5f6-7890-abcd-ef1234567890"))
+
+    def test_loadfindings_rest_does_not_call_es_for_demo_id(self):
+        from loadfindings import LoadFindingsCommand
+
+        cmd = LoadFindingsCommand("loadfindings")
+        cmd.options = {"mode": "rest", "finding_id": "F-1001", "limit": "1"}
+
+        def boom(*_a, **_k):
+            raise AssertionError("ES should not be called for bundled demo finding ids")
+
+        cmd._from_es = boom  # type: ignore[method-assign]
+        rows = list(cmd.generate())
+        self.assertEqual(rows[0]["finding_id"], "F-1001")
+        self.assertIn(rows[0]["investigation_required"], {"Yes", "Review", "No"})
+
+    def test_agent_rest_demo_id_skips_es(self):
+        agent = FindingEvidenceAgent(
+            mode="rest",
+            finding_id="F-1001",
+            tasks=("score", "emit"),
+            run_searches=False,
+            limit=1,
+            home=APP,
+            session_key="sess",
+            splunkd_uri="https://127.0.0.1:8089",
+        )
+        cycle = agent.run()
+        self.assertEqual(cycle["count"], 1)
+        self.assertEqual(cycle["results"][0]["finding_id"], "F-1001")
+
+    def test_get_finding_400_is_empty(self):
+        client = ESClient("https://127.0.0.1:8089", "session")
+
+        def _get(path, params=None):
+            raise ESClientError(f"ES API 400 for {path}", status=400)
+
+        client._get = _get  # type: ignore[method-assign]
+        self.assertEqual(client.get_finding("F-1001"), {})
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 <form version="1.1" theme="dark" stylesheet="dashboard.css">
   <label>Finding workbench</label>
-  <description>Triage agent enrichment, weighted evidence, recommended searches, and the follow-up score for one finding.</description>
+  <description>Triage agent enrichment, weighted evidence, recommended searches, and the follow-up score for one finding. F-1001–F-1012 are bundled demo ids (not Mission Control). Paste a real ES finding id only when using the ES API source.</description>
   <fieldset submitButton="true" autoRun="true">
     <input type="dropdown" token="mode">
       <label>Data source</label>

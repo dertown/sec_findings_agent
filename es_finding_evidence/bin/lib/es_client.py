@@ -20,7 +20,9 @@ INVESTIGATION_NOTES_PATH = "/servicesNS/nobody/missioncontrol/public/v2/investig
 
 
 class ESClientError(RuntimeError):
-    pass
+    def __init__(self, message: str, status: int | None = None):
+        super().__init__(message)
+        self.status = status
 
 
 class ESClient:
@@ -56,7 +58,7 @@ class ESClient:
                 raw = resp.read().decode("utf-8")
         except urllib.error.HTTPError as exc:
             body = exc.read().decode("utf-8", errors="replace")[:500]
-            raise ESClientError(f"ES API {exc.code} for {path}: {body}") from exc
+            raise ESClientError(f"ES API {exc.code} for {path}: {body}", status=exc.code) from exc
         except urllib.error.URLError as exc:
             raise ESClientError(f"ES API unreachable at {url}: {exc}") from exc
         if not raw:
@@ -96,7 +98,19 @@ class ESClient:
         return _as_records(payload)
 
     def get_finding(self, finding_id: str) -> dict[str, Any]:
-        payload = self._get(FINDING_PATH.format(id=urllib.parse.quote(finding_id, safe="")))
+        ident = urllib.parse.quote(finding_id, safe="")
+        try:
+            payload = self._get(FINDING_PATH.format(id=ident))
+        except ESClientError as exc:
+            if exc.status not in {400, 404}:
+                raise
+            try:
+                records = self.get_findings(finding_ids=finding_id, limit=1)
+            except ESClientError as list_exc:
+                if list_exc.status in {400, 404}:
+                    return {}
+                raise
+            return records[0] if records else {}
         records = _as_records(payload)
         return records[0] if records else (payload if isinstance(payload, dict) else {})
 
@@ -149,7 +163,7 @@ class ESClient:
                 raw = resp.read().decode("utf-8")
         except urllib.error.HTTPError as exc:
             body_txt = exc.read().decode("utf-8", errors="replace")[:400]
-            raise ESClientError(f"ES note API {exc.code}: {body_txt}") from exc
+            raise ESClientError(f"ES note API {exc.code}: {body_txt}", status=exc.code) from exc
         return json.loads(raw) if raw else {}
 
     def _post_json(self, path: str, payload: Mapping[str, Any]) -> Any:
@@ -168,7 +182,7 @@ class ESClient:
                 raw = resp.read().decode("utf-8")
         except urllib.error.HTTPError as exc:
             body_txt = exc.read().decode("utf-8", errors="replace")[:400]
-            raise ESClientError(f"ES API {exc.code} {path}: {body_txt}") from exc
+            raise ESClientError(f"ES API {exc.code} {path}: {body_txt}", status=exc.code) from exc
         return json.loads(raw) if raw else {}
 
     def update_finding_fields(self, finding_id: str, fields: Mapping[str, Any]) -> Any:

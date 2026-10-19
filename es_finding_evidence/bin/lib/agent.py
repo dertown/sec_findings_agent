@@ -11,6 +11,7 @@ import time
 from typing import Any, Callable, Mapping, Sequence
 
 from .analyze import demo_records
+from .demo import is_demo_finding_id
 from .constants import DEFAULT_WINDOW_MINUTES, INVESTIGATE_THRESHOLD, REVIEW_THRESHOLD
 from .evidence import evidence_from_executed_search
 from .findings import normalize_finding
@@ -125,7 +126,7 @@ class FindingEvidenceAgent:
     def _load(self) -> list[dict[str, Any]]:
         if self.finding_loader:
             return self.finding_loader()
-        if self.mode in {"demo", "sample"}:
+        if self.mode in {"demo", "sample"} or is_demo_finding_id(self.finding_id):
             rows = demo_records()
             if self.finding_id:
                 rows = [row for row in rows if row.get("finding_id") == self.finding_id]
