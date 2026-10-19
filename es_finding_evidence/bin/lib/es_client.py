@@ -152,6 +152,64 @@ class ESClient:
             raise ESClientError(f"ES note API {exc.code}: {body_txt}") from exc
         return json.loads(raw) if raw else {}
 
+    def _post_json(self, path: str, payload: Mapping[str, Any]) -> Any:
+        request = urllib.request.Request(
+            self.base + path,
+            data=json.dumps(payload).encode("utf-8"),
+            method="POST",
+            headers={
+                "Authorization": f"Splunk {self.session_key}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout, context=self.ssl_context) as resp:
+                raw = resp.read().decode("utf-8")
+        except urllib.error.HTTPError as exc:
+            body_txt = exc.read().decode("utf-8", errors="replace")[:400]
+            raise ESClientError(f"ES API {exc.code} {path}: {body_txt}") from exc
+        return json.loads(raw) if raw else {}
+
+    def update_finding_fields(self, finding_id: str, fields: Mapping[str, Any]) -> Any:
+        """Write enrichment fields onto the finding. Does not set status/owner/disposition."""
+        blocked = {"status", "owner", "disposition", "urgency", "newOwner"}
+        safe = {k: v for k, v in fields.items() if k not in blocked and v not in (None, "")}
+        ident = urllib.parse.quote(finding_id, safe="")
+        last_error = None
+        for path in (
+            f"/servicesNS/nobody/missioncontrol/public/v2/findings/{ident}",
+            f"/servicesNS/nobody/missioncontrol/public/v2/investigations/{ident}",
+        ):
+            try:
+                return self._post_json(path, safe)
+            except ESClientError as exc:
+                last_error = exc
+        if last_error:
+            raise last_error
+        return {}
+
+    def enrich_finding(self, finding_id: str, fields: Mapping[str, Any], note: str) -> dict[str, Any]:
+        """Push enrichment onto the finding: additional fields plus a Mission Control note."""
+        result = {"fields": False, "note": False, "error": ""}
+        try:
+            self.update_finding_fields(finding_id, fields)
+            result["fields"] = True
+        except ESClientError as exc:
+            result["error"] = str(exc)
+        try:
+            self.post_note(finding_id, note)
+            result["note"] = True
+            if result["error"].startswith("ES API") and "note" in result["error"].lower():
+                pass
+            elif result["note"]:
+                # A note on the finding is enough for analysts even if custom fields are not configured.
+                if not result["fields"]:
+                    result["error"] = result["error"]
+        except ESClientError as exc:
+            result["error"] = (result["error"] + " | " + str(exc)).strip(" |")
+        return result
+
 
 def _as_records(payload: Any) -> list[dict[str, Any]]:
     if payload is None:

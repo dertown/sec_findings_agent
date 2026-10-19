@@ -1,7 +1,14 @@
 # Custom judges
 
-The backend agent runs every enabled judge in `judges.conf` after it gathers
-evidence. Add your own without editing app Python.
+The backend agent runs every enabled judge after it gathers evidence. Add your
+own without editing app Python.
+
+## Splunk Web (preferred)
+
+Open **Finding Evidence Advisor → Judge manager**. Create a **rule** judge (filters
++ decision) or a **Python** judge. UI judges are stored in the `fea_custom_judges`
+KV collection. Python source is written only under `local/judges/` after name and
+source checks (no `eval`, `exec`, `subprocess`, `os`, or network libraries).
 
 ## 1. Python judge
 

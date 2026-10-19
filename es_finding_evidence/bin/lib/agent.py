@@ -22,7 +22,7 @@ from .search_runner import DemoSearchRunner, NullSearchRunner, SearchRunner, Spl
 from .util import dumps
 
 
-DEFAULT_TASKS = ("gather_evidence", "score", "persist", "emit")
+DEFAULT_TASKS = ("gather_evidence", "score", "enrich", "persist", "emit")
 
 
 class FindingEvidenceAgent:
@@ -41,6 +41,8 @@ class FindingEvidenceAgent:
         finding_loader: Callable[..., list[dict[str, Any]]] | None = None,
         persister: Callable[[list[dict[str, Any]]], None] | None = None,
         note_writer: Callable[[dict[str, Any]], None] | None = None,
+        enricher: Callable[[dict[str, Any]], None] | None = None,
+        kv_judges: list | None = None,
         investigate_threshold: float = INVESTIGATE_THRESHOLD,
         review_threshold: float = REVIEW_THRESHOLD,
         write_notes: bool = False,
@@ -63,6 +65,7 @@ class FindingEvidenceAgent:
         self.finding_loader = finding_loader
         self.persister = persister
         self.note_writer = note_writer
+        self.enricher = enricher
         self.investigate_threshold = investigate_threshold
         self.review_threshold = review_threshold
         self.write_notes = write_notes
@@ -73,6 +76,10 @@ class FindingEvidenceAgent:
         self.splunkd_uri = splunkd_uri
         self.session_key = session_key
         self.judges = load_judges(home)
+        if kv_judges:
+            from .judge_store import merge_kv_judges
+
+            self.judges = merge_kv_judges(self.judges, kv_judges, home)
 
     def run(self) -> dict[str, Any]:
         started = time.time()
@@ -84,6 +91,14 @@ class FindingEvidenceAgent:
                 results.append(self._handle(record))
             except Exception as exc:  # noqa: BLE001 - keep the cycle alive
                 errors.append({"finding_id": record.get("finding_id") or record.get("id"), "error": str(exc)})
+        if self.enricher and "enrich" in self.tasks:
+            for item in results:
+                try:
+                    self.enricher(item)
+                except Exception as exc:  # noqa: BLE001
+                    errors.append({"task": "enrich", "finding_id": item.get("finding_id"), "error": str(exc)})
+                    item["enrichment_posted"] = 0
+                    item["enrichment_error"] = str(exc)
         if self.persister and "persist" in self.tasks:
             try:
                 self.persister(results)
@@ -202,17 +217,68 @@ class FindingEvidenceAgent:
         row["judges_json"] = dumps(judged.get("judges") or [])
         row["agent_tasks"] = ",".join(self.tasks)
         row["override_applied"] = judged.get("override_applied") or ""
+        row["enrichment_posted"] = row.get("enrichment_posted") or 0
+        row["enrichment_error"] = row.get("enrichment_error") or ""
         return row
 
 
 def agent_from_options(options: Mapping[str, str], **kwargs: Any) -> FindingEvidenceAgent:
-    tasks = options.get("tasks") or ",".join(DEFAULT_TASKS)
-    task_list = [part.strip() for part in str(tasks).split(",") if part.strip()]
+    if options.get("tasks"):
+        task_list = [part.strip() for part in str(options.get("tasks")).split(",") if part.strip()]
+    else:
+        task_list = list(DEFAULT_TASKS)
     write_notes = str(options.get("write_notes") or "false").lower() in {"1", "true", "yes"}
     if write_notes and "write_notes" not in task_list:
         task_list.append("write_notes")
     session_key = kwargs.get("session_key") or ""
     splunkd_uri = kwargs.get("splunkd_uri") or ""
+    mode = str(options.get("mode") or kwargs.get("mode") or "auto")
+    if session_key and not kwargs.get("kv_judges"):
+        try:
+            from .kvstore import KvCollection
+
+            kwargs["kv_judges"] = KvCollection(splunkd_uri, session_key, "fea_custom_judges").list()
+        except Exception:
+            kwargs["kv_judges"] = []
+    if session_key and "enrich" in task_list and not kwargs.get("enricher"):
+        from .enrichment import build_enrichment, build_note, compact_fields
+        from .es_client import ESClient
+        from .kvstore import KvCollection
+
+        client = ESClient(splunkd_uri, session_key) if mode not in {"demo", "sample"} else None
+        try:
+            enrich_kv: KvCollection | None = KvCollection(splunkd_uri, session_key, "finding_enrichment")
+        except Exception:
+            enrich_kv = None
+
+        def _enrich(row: dict[str, Any]) -> None:
+            fid = str(row.get("finding_id") or "")
+            full = build_enrichment(row)
+            note = build_note(row)
+            posted = {"fields": False, "note": False, "error": ""}
+            if client and fid:
+                posted = client.enrich_finding(fid, compact_fields(row), note)
+            row["enrichment_note"] = note
+            row["enrichment_posted"] = 1 if (posted.get("note") or posted.get("fields") or mode in {"demo", "sample"}) else 0
+            row["enrichment_error"] = posted.get("error") or ""
+            stored = dict(full)
+            stored.update(
+                {
+                    "finding_id": fid,
+                    "title": row.get("title"),
+                    "note": note,
+                    "enrichment_posted": row["enrichment_posted"],
+                    "enrichment_error": row["enrichment_error"],
+                    "_time": row.get("_time"),
+                }
+            )
+            if enrich_kv and fid:
+                try:
+                    enrich_kv.put(fid, stored)
+                except Exception as exc:  # noqa: BLE001
+                    row["enrichment_error"] = (row.get("enrichment_error") or "") + ((" | " if row.get("enrichment_error") else "") + f"kv:{exc}")
+
+        kwargs["enricher"] = _enrich
     if write_notes and session_key and not kwargs.get("note_writer"):
         from .es_client import ESClient
 
@@ -222,11 +288,9 @@ def agent_from_options(options: Mapping[str, str], **kwargs: Any) -> FindingEvid
             fid = row.get("finding_id")
             if not fid:
                 return
-            body = (
-                f"Finding Evidence Agent: follow-up {row.get('followup_score')} "
-                f"({row.get('investigation_required')}).\n{row.get('rationale') or ''}"
-            )
-            client.post_note(str(fid), body[:4000])
+            from .enrichment import build_note
+
+            client.post_note(str(fid), build_note(row))
 
         kwargs["note_writer"] = _write
     return FindingEvidenceAgent(

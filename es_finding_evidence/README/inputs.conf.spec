@@ -8,6 +8,8 @@ status = <string>
 urgency = <string>
 limit = <integer>
 tasks = <comma-separated-tasks>
+* Default: gather_evidence,score,enrich,persist,emit
+* enrich posts score, judges, evidence, and searches onto the ES finding.
 run_searches = <bool>
 max_searches_per_finding = <integer>
 search_timeout = <integer>

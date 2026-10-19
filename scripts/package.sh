@@ -14,6 +14,6 @@ tar -C "$APP" -cf - \
   --exclude='.DS_Store' \
   . | tar -C "$STAGE/es_finding_evidence" -xf -
 # Splunk .spl is a gzip tarball whose top-level folder is the app id.
-tar -C "$STAGE" -czf "$OUT/es_finding_evidence-1.1.0.spl" es_finding_evidence
-echo "Wrote $OUT/es_finding_evidence-1.1.0.spl"
-tar -tzf "$OUT/es_finding_evidence-1.1.0.spl" | head
+tar -C "$STAGE" -czf "$OUT/es_finding_evidence-1.2.0.spl" es_finding_evidence
+echo "Wrote $OUT/es_finding_evidence-1.2.0.spl"
+tar -tzf "$OUT/es_finding_evidence-1.2.0.spl" | head -n 20 || true

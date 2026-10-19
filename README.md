@@ -1,6 +1,6 @@
 # Finding Evidence Advisor
 
-A Splunk Enterprise app for **Splunk Enterprise Security (ES) 8.x**. It is a **backend agent**: it loads **findings** and **Triage agent** enrichment, **runs evidence searches**, applies **built-in and custom judge functions**, and scores whether an analyst should **follow up / open an investigation**.
+A Splunk Enterprise app for **Splunk Enterprise Security (ES) 8.x**. It is a **backend agent**: it loads **findings** and **Triage agent** enrichment, **runs evidence searches**, applies **built-in and custom judge functions** (including judges added in Splunk Web), and scores whether an analyst should **follow up / open an investigation**. **Every cycle posts that full result onto the ES finding as enrichment.**
 
 This is not an official Splunk or Cisco product. It is designed to sit beside Mission Control and the ES 8.6 Triage agent.
 
@@ -10,11 +10,12 @@ This is not an official Splunk or Cisco product. It is designed to sit beside Mi
 2. **Attach Triage agent enrichment** — disposition, summary, justification, tools/connectors, evidence, analysis details.
 3. **Recommend and (in backend mode) execute evidence searches** for the entities on the finding.
 4. **Run judges** — built-in follow-up score, triage guardrails, critical-asset bump, plus any custom Python or rule judges you register.
-5. **Persist / emit** scores to KV store and `fea:agent:result` events. Optionally write a note back onto the ES finding (`write_notes=true`). The agent does not change disposition unless you add an override judge that you then act on yourself.
+5. **Enrich the finding** — post a Mission Control note plus `fea_*` fields with the score, investigation decision, judges, weighted evidence, and searches that were run. The agent does **not** change owner, status, urgency, or disposition.
+6. **Persist / emit** scores to KV store and `fea:agent:result` events so the Agent activity dashboard can show what ran.
 
 ## Install
 
-1. Package is `dist/es_finding_evidence-1.1.0.spl` (gzip tarball).
+1. Package is `dist/es_finding_evidence-1.2.0.spl` (gzip tarball).
 2. In Splunk Web: **Manage apps → Install app from file**.
 3. Restart the search head if commands do not appear immediately.
 4. Open the **Finding Evidence Advisor** app.
@@ -26,10 +27,11 @@ Requires Splunk Enterprise 9.x / 10.x (Python 3). Live ES mode needs **Enterpris
 | View | Purpose |
 | --- | --- |
 | **Follow-up queue** | Scored findings, investigation decision, drilldown to the workbench |
-| **Finding workbench** | One finding: agent enrichment, weighted evidence, recommended SPL |
+| **Finding workbench** | One finding: posted enrichment note, triage, weighted evidence, recommended SPL |
+| **Judge manager** | Add/edit/delete rule and Python judges in Splunk Web |
+| **Agent activity** | What the agent ran, enrichment posted onto findings, indexed cycles |
 | **Scoring model** | How the 0–100 score is built |
 | **Evidence search catalog** | Templates and rendered searches |
-| **Backend agent** | Run a cycle, see executed searches and judge votes |
 
 Switch **Data source** to `Demo findings` to explore without ES, or `ES Mission Control API` for live findings.
 
@@ -81,8 +83,16 @@ REST (session-authenticated):
 ```
 GET  /services/es_finding_evidence/analyze?demo=true
 POST /services/es_finding_evidence/analyze   { finding JSON }
-GET  /services/es_finding_evidence/judges
-POST /services/es_finding_evidence/agent/run   { "mode":"demo", "run_searches":true }
+GET/POST/DELETE  /services/es_finding_evidence/judges
+POST             /services/es_finding_evidence/agent/run   { "mode":"demo", "run_searches":true }
+GET              /services/es_finding_evidence/enrichment
+```
+
+List judges and posted enrichment from search:
+
+```spl
+| listjudges
+| listenrichment finding_id=F-1001
 ```
 
 ## Backend agent
@@ -91,14 +101,24 @@ Enable a scheduled worker: **Settings → Data inputs → Finding Evidence Agent
 
 1. `gather_evidence` — run the top N recommended SPL jobs via the Splunk session
 2. `score` — run the judge pipeline
-3. `persist` — upsert `finding_evidence_scores` KV collection
-4. `emit` — index `fea:agent:cycle` / `fea:agent:result`
+3. `enrich` — post the full result onto the ES finding (note + `fea_*` fields) and store a copy in `finding_enrichment`
+4. `persist` — upsert `finding_evidence_scores` KV collection
+5. `emit` — index `fea:agent:cycle` / `fea:agent:result`
 
-Optional task `write_notes` posts a note onto the ES finding. Off by default.
+The agent never writes owner, status, urgency, or disposition. Optional extra task `write_notes` is redundant with `enrich` (enrich already posts the note).
+
+## Finding enrichment
+
+Every handled finding gets:
+
+- A Mission Control **note** titled `Finding Evidence Agent enrichment` with the score, decision, weighted evidence, searches the agent ran, judges, and a `fea-enrichment` JSON fence (the complete payload).
+- Scalar **`fea_*` fields** on the finding (`fea_followup_score`, `fea_investigation_required`, `fea_agent_summary`, …). Large JSON blobs stay in the note so the finding fields stay small.
+
+Demo mode still writes `finding_enrichment` KV so the workbench and Agent activity dashboards show the same payload without live ES.
 
 ## Custom judges
 
-Add judges without changing app code. See `es_finding_evidence/judges/README.md`.
+Add judges in **Judge manager** (Splunk Web) or without the UI. See `es_finding_evidence/judges/README.md`.
 
 **Python** — `local/judges/my_judge.py`:
 
@@ -180,14 +200,15 @@ Twelve sample SOC cases covering credential dumping, brute force, sanctioned sca
 
 - **No passwords, API keys, or tokens are stored in the app.** ES calls use the current Splunk session key on the local management port.
 - Evidence IDs are **SHA-256** prefixes of non-secret finding fields.
-- The app does not change finding disposition, owner, or status. It only recommends.
+- The app does not change finding disposition, owner, urgency, or status. Enrichment is a note plus `fea_*` fields.
 
 ## Layout
 
 ```
 es_finding_evidence/
   bin/                 custom commands + REST handler
-  bin/lib/             scoring, templates, ES client (pure Python)
+  bin/lib/             scoring, templates, ES client, judges, enrichment
+  appserver/static/    Splunk Web judge manager and agent activity JS/CSS
   default/             conf, dashboards, macros, saved searches
   lookups/             weights, templates, sample ids
   metadata/
@@ -196,5 +217,5 @@ es_finding_evidence/
 Run tests from the repo root:
 
 ```
-python3 -m unittest tests.test_scoring -v
+python3 -m unittest discover -s tests -v
 ```

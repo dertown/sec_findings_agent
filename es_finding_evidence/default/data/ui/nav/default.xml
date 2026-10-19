@@ -1,8 +1,9 @@
 <nav search_view="overview" color="#0B3D5C">
   <view name="overview" default="true" />
   <view name="finding_workbench" />
+  <view name="judge_manager" />
+  <view name="agent_ops" />
   <view name="scoring_model" />
   <view name="search_catalog" />
-  <view name="agent_ops" />
   <a href="/app/search/search">Search</a>
 </nav>

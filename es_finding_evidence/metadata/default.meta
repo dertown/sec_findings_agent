@@ -26,6 +26,14 @@ export = system
 access = read : [ * ], write : [ admin, ess_admin, ess_analyst, es_finding_evidence_analyst ]
 export = system
 
+[collections/fea_custom_judges]
+access = read : [ * ], write : [ admin, ess_admin, es_finding_evidence_analyst ]
+export = system
+
+[collections/finding_enrichment]
+access = read : [ * ], write : [ admin, ess_admin, ess_analyst, es_finding_evidence_analyst ]
+export = system
+
 [inputs]
 export = system
 

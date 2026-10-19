@@ -38,7 +38,7 @@ SCHEME = """<scheme>
       </arg>
       <arg name="tasks">
         <title>Tasks</title>
-        <description>Comma-separated: gather_evidence,score,persist,emit,write_notes</description>
+        <description>Comma-separated: gather_evidence,score,enrich,persist,emit,write_notes</description>
         <data_type>string</data_type>
         <required_on_create>false</required_on_create>
       </arg>

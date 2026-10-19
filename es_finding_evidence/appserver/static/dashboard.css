@@ -11,3 +11,13 @@
 .fea-help b {
   color: #ffffff;
 }
+.fea-judge-status {
+  min-height: 1.4em;
+  margin: 0 0 12px 0;
+}
+.fea-ok {
+  color: #53a051;
+}
+.fea-err {
+  color: #dc4e41;
+}

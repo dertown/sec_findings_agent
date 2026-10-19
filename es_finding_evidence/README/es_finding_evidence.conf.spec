@@ -17,3 +17,11 @@ fallback_index = <index>
 [triage]
 parse_notes = <bool>
 field_prefix = <string>
+
+[agent]
+tasks = <comma-separated-tasks>
+run_searches = <bool>
+max_searches_per_finding = <int>
+search_timeout = <int>
+write_notes = <bool>
+create_investigation = <bool>

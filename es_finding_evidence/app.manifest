@@ -5,7 +5,7 @@
     "id": {
       "group": null,
       "name": "es_finding_evidence",
-      "version": "1.1.0"
+      "version": "1.2.0"
     },
     "author": [
       {
@@ -15,7 +15,7 @@
       }
     ],
     "releaseDate": null,
-    "description": "Use Splunk Enterprise Security findings and Triage agent enrichment to recommend evidence searches, weight evidence, and score whether a finding needs investigation.",
+    "description": "Backend agent for Splunk Enterprise Security findings: run evidence searches, add judges in Splunk Web, and post all results onto the finding for enrichment.",
     "classification": {
       "intendedAudience": "Security",
       "categories": ["Security, Fraud & Compliance"],
