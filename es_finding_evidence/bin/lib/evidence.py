@@ -40,6 +40,8 @@ EVIDENCE_CLASSES = {
     "known_scanner": {"weight": 60, "source": "finding_metadata", "direction": "refuting"},
     "sanctioned_admin": {"weight": 52, "source": "finding_metadata", "direction": "refuting"},
     "low_confidence_detection": {"weight": 28, "source": "finding_metadata", "direction": "refuting"},
+    "executed_search_hit": {"weight": 70, "source": "executed_search", "direction": "supporting"},
+    "executed_search_miss": {"weight": 18, "source": "executed_search", "direction": "refuting"},
 }
 
 
@@ -82,6 +84,57 @@ def _item(
         "search_name": search_name,
         "priority": priority,
     }
+
+
+def evidence_from_executed_search(finding_id: str, search: Mapping[str, Any], result: Mapping[str, Any]) -> dict[str, Any]:
+    """Turn a backend-executed evidence search into an observed evidence item."""
+    count = int(to_float(result.get("count"), 0))
+    error = str(result.get("error") or "")
+    direction = search.get("direction") or "supporting"
+    name = str(search.get("search_name") or search.get("title") or "evidence search")
+    if error:
+        return _item(
+            finding_id,
+            "executed_search_miss",
+            f"Search failed: {name}",
+            error[:300],
+            direction="refuting",
+            source="executed_search",
+            weight=5,
+            confidence=0.2,
+            search=search.get("search"),
+            search_name=name,
+            priority=int(search.get("priority") or 50),
+        )
+    if count <= 0:
+        return _item(
+            finding_id,
+            "executed_search_miss",
+            f"No hits: {name}",
+            "Backend agent ran this search and it returned no events.",
+            direction="refuting" if direction == "supporting" else "supporting",
+            source="executed_search",
+            weight=12,
+            confidence=0.45,
+            search=search.get("search"),
+            search_name=name,
+            priority=int(search.get("priority") or 50),
+        )
+    confidence = clamp(0.45 + min(count, 50) / 80.0, 0.0, 0.95)
+    base = to_float(search.get("potential_weight") or search.get("base_weight"), 70)
+    return _item(
+        finding_id,
+        "executed_search_hit",
+        f"{count} hit(s): {name}",
+        result.get("summary") or f"Backend agent search returned {count} events.",
+        direction=direction,
+        source="executed_search",
+        weight=base,
+        confidence=confidence,
+        search=search.get("search"),
+        search_name=name,
+        priority=int(search.get("priority") or 50),
+    )
 
 
 def _text_blob(finding: Mapping[str, Any]) -> str:

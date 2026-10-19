@@ -1,0 +1,109 @@
+<form version="1.1" theme="dark" stylesheet="dashboard.css">
+  <label>Backend agent</label>
+  <description>Run the Finding Evidence Agent in the backend: execute evidence searches, apply built-in and custom judges, persist scores. Enable the modular input under Settings → Data inputs for a scheduled cycle.</description>
+  <fieldset submitButton="true" autoRun="true">
+    <input type="dropdown" token="mode">
+      <label>Finding source</label>
+      <choice value="demo">Demo findings</choice>
+      <choice value="rest">ES Mission Control API</choice>
+      <choice value="auto">Auto</choice>
+      <default>demo</default>
+    </input>
+    <input type="dropdown" token="run_searches">
+      <label>Run evidence searches</label>
+      <choice value="true">Yes (backend gathers hits)</choice>
+      <choice value="false">No (score only)</choice>
+      <default>true</default>
+    </input>
+    <input type="text" token="limit">
+      <label>Finding limit</label>
+      <default>12</default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <html>
+        <div class="fea-help">
+          <h2>How the agent works</h2>
+          <ol>
+            <li>Load ES findings (or demo samples).</li>
+            <li><b>gather_evidence</b> — run the top recommended SPL searches on this search head.</li>
+            <li><b>score</b> — run every enabled judge in <code>judges.conf</code> (builtin, rule, and custom Python).</li>
+            <li><b>persist / emit</b> — write KV store + index events (<code>fea:agent:result</code>).</li>
+          </ol>
+          <p>Add a custom judge: drop <code>local/judges/my_judge.py</code> with a <code>judge()</code> function, or add a stanza to <code>local/judges.conf</code>. See <code>judges/README.md</code>.</p>
+          <p>Scheduled backend: Settings → Data inputs → Finding Evidence Agent → enable the default input (disabled out of the box).</p>
+        </div>
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <single>
+        <title>Investigation required</title>
+        <search>
+          <query>| findingagent mode=$mode$ run_searches=$run_searches$ limit=$limit$ | stats count(eval(investigation_required="Yes")) as count</query>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[1,5]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>Searches executed</title>
+        <search>
+          <query>| findingagent mode=$mode$ run_searches=$run_searches$ limit=$limit$ | stats sum(executed_search_count) as count</query>
+        </search>
+        <option name="underLabel">this cycle</option>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>Enabled judges</title>
+        <search>
+          <query>| rest splunk_server=local /services/es_finding_evidence/judges | spath | stats count</query>
+        </search>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Agent cycle (scored findings)</title>
+      <table>
+        <search>
+          <query>| findingagent mode=$mode$ run_searches=$run_searches$ limit=$limit$ | sort - followup_score | table followup_score, investigation_required, override_applied, finding_id, title, urgency, triage_disposition, executed_search_count, evidence_net_weight, agent_tasks</query>
+        </search>
+        <option name="count">20</option>
+        <option name="drilldown">row</option>
+        <option name="wrap">true</option>
+        <format type="color" field="followup_score">
+          <colorPalette type="list">[#53a051,#f8be34,#f1813f,#dc4e41]</colorPalette>
+          <scale type="threshold">30,50,75</scale>
+        </format>
+        <format type="color" field="investigation_required">
+          <colorPalette type="map">{"Yes":#dc4e41,"Review":#f8be34,"No":#53a051}</colorPalette>
+        </format>
+        <drilldown>
+          <link target="_blank">
+            <![CDATA[/app/es_finding_evidence/finding_workbench?form.finding_id=$row.finding_id$&form.mode=$mode$]]>
+          </link>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Judge votes (from judges_json)</title>
+      <table>
+        <search>
+          <query>| findingagent mode=$mode$ run_searches=$run_searches$ limit=$limit$ | spath input=judges_json path={} output=j | mvexpand j | eval name=spath(j,"name"), decision=spath(j,"decision"), score=spath(j,"score"), mode=spath(j,"mode"), abstain=spath(j,"abstain"), rationale=spath(j,"rationale") | table finding_id, name, mode, score, decision, abstain, rationale</query>
+        </search>
+        <option name="count">40</option>
+        <option name="drilldown">none</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+</form>

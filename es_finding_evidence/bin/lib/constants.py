@@ -52,6 +52,7 @@ SOURCE_RELIABILITY = {
     "asset_identity": 0.75,
     "related_findings": 0.72,
     "recommended_search": 0.0,  # unrun searches never inflate the live score
+    "executed_search": 0.88,  # backend agent actually ran the SPL
 }
 
 # Later kill-chain phases need human follow-up more often.

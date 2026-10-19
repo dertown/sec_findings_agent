@@ -1,20 +1,20 @@
 # Finding Evidence Advisor
 
-A Splunk Enterprise app for **Splunk Enterprise Security (ES) 8.x**. It reads **findings** and **Triage agent** enrichment, recommends Splunk searches that would prove or disprove the finding, **weights** that evidence, and scores whether an analyst should **follow up / open an investigation**.
+A Splunk Enterprise app for **Splunk Enterprise Security (ES) 8.x**. It is a **backend agent**: it loads **findings** and **Triage agent** enrichment, **runs evidence searches**, applies **built-in and custom judge functions**, and scores whether an analyst should **follow up / open an investigation**.
 
 This is not an official Splunk or Cisco product. It is designed to sit beside Mission Control and the ES 8.6 Triage agent.
 
 ## What it does
 
-1. **Load findings** from the ES Mission Control API (`/servicesNS/nobody/missioncontrol/public/v2/findings`) or from notables already on the pipeline (`index=notable | findingevidence`).
-2. **Attach Triage agent enrichment** — disposition, summary, justification, tools/connectors, evidence, analysis details — from finding fields or notes. The ES 8.6 Analysis panel is the source of those values; the agent never auto-dispositions the finding, and neither does this app.
-3. **Recommend evidence searches** (CIM-oriented SPL) for the entities on the finding: user, src/dest, hash, domain, URL, process, threat object, risk object.
-4. **Weight observed evidence** (finding metadata + agent output + SOAR connector verdicts). Recommended searches that have not been run do **not** inflate the live score.
-5. **Score follow-up (0–100)** and decide **Yes / Review / No**.
+1. **Load findings** from the ES Mission Control API or from notables already on the pipeline.
+2. **Attach Triage agent enrichment** — disposition, summary, justification, tools/connectors, evidence, analysis details.
+3. **Recommend and (in backend mode) execute evidence searches** for the entities on the finding.
+4. **Run judges** — built-in follow-up score, triage guardrails, critical-asset bump, plus any custom Python or rule judges you register.
+5. **Persist / emit** scores to KV store and `fea:agent:result` events. Optionally write a note back onto the ES finding (`write_notes=true`). The agent does not change disposition unless you add an override judge that you then act on yourself.
 
 ## Install
 
-1. Package is `dist/es_finding_evidence-1.0.0.spl` (gzip tarball).
+1. Package is `dist/es_finding_evidence-1.1.0.spl` (gzip tarball).
 2. In Splunk Web: **Manage apps → Install app from file**.
 3. Restart the search head if commands do not appear immediately.
 4. Open the **Finding Evidence Advisor** app.
@@ -29,6 +29,7 @@ Requires Splunk Enterprise 9.x / 10.x (Python 3). Live ES mode needs **Enterpris
 | **Finding workbench** | One finding: agent enrichment, weighted evidence, recommended SPL |
 | **Scoring model** | How the 0–100 score is built |
 | **Evidence search catalog** | Templates and rendered searches |
+| **Backend agent** | Run a cycle, see executed searches and judge votes |
 
 Switch **Data source** to `Demo findings` to explore without ES, or `ES Mission Control API` for live findings.
 
@@ -68,12 +69,73 @@ Weighted evidence:
 | table evidence_signed_weight, evidence_direction, evidence_title, evidence_detail
 ```
 
+Backend agent cycle (gathers evidence, applies judges):
+
+```spl
+| findingagent mode=demo run_searches=true limit=12
+| table finding_id, followup_score, investigation_required, executed_search_count, override_applied
+```
+
 REST (session-authenticated):
 
 ```
 GET  /services/es_finding_evidence/analyze?demo=true
 POST /services/es_finding_evidence/analyze   { finding JSON }
+GET  /services/es_finding_evidence/judges
+POST /services/es_finding_evidence/agent/run   { "mode":"demo", "run_searches":true }
 ```
+
+## Backend agent
+
+Enable a scheduled worker: **Settings → Data inputs → Finding Evidence Agent** (disabled by default). Each interval it:
+
+1. `gather_evidence` — run the top N recommended SPL jobs via the Splunk session
+2. `score` — run the judge pipeline
+3. `persist` — upsert `finding_evidence_scores` KV collection
+4. `emit` — index `fea:agent:cycle` / `fea:agent:result`
+
+Optional task `write_notes` posts a note onto the ES finding. Off by default.
+
+## Custom judges
+
+Add judges without changing app code. See `es_finding_evidence/judges/README.md`.
+
+**Python** — `local/judges/my_judge.py`:
+
+```python
+def judge(finding, evidence, searches, context):
+    if finding.get("user") == "admin":
+        return {"score": 85, "decision": "Yes", "mode": "override", "rationale": "admin account"}
+    return {"abstain": True}
+```
+
+Register in `local/judges.conf`:
+
+```
+[my_judge]
+enabled = 1
+type = python
+file = my_judge.py
+function = judge
+mode = override
+weight = 0.8
+```
+
+Files must live under `local/judges/`, `judges/`, or `bin/judges/`. Arbitrary paths are rejected.
+
+**Rule** (no Python):
+
+```
+[force_critical]
+type = rule
+mode = override
+when_urgency = critical
+decision = Yes
+score = 90
+rationale = SOC policy
+```
+
+Judge modes: `vote` (weighted score), `adjust` (add `adjustment` points), `override` (force a decision).
 
 ## Follow-up score
 

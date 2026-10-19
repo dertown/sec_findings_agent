@@ -25,3 +25,9 @@ export = system
 [collections/finding_evidence_scores]
 access = read : [ * ], write : [ admin, ess_admin, ess_analyst, es_finding_evidence_analyst ]
 export = system
+
+[inputs]
+export = system
+
+[props]
+export = system

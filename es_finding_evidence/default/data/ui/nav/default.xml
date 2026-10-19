@@ -3,5 +3,6 @@
   <view name="finding_workbench" />
   <view name="scoring_model" />
   <view name="search_catalog" />
+  <view name="agent_ops" />
   <a href="/app/search/search">Search</a>
 </nav>

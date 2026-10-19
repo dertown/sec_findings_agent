@@ -130,6 +130,28 @@ class ESClient:
                     record["notes"] = self.get_notes(ident)
         return records
 
+    def post_note(self, finding_id: str, body: str) -> Any:
+        """Attach an analyst-visible note. Opt-in from the agent write_notes task."""
+        payload = json.dumps({"body": body, "comment": body}).encode("utf-8")
+        path = FINDING_NOTES_PATH.format(id=urllib.parse.quote(finding_id, safe=""))
+        request = urllib.request.Request(
+            self.base + path,
+            data=payload,
+            method="POST",
+            headers={
+                "Authorization": f"Splunk {self.session_key}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout, context=self.ssl_context) as resp:
+                raw = resp.read().decode("utf-8")
+        except urllib.error.HTTPError as exc:
+            body_txt = exc.read().decode("utf-8", errors="replace")[:400]
+            raise ESClientError(f"ES note API {exc.code}: {body_txt}") from exc
+        return json.loads(raw) if raw else {}
+
 
 def _as_records(payload: Any) -> list[dict[str, Any]]:
     if payload is None:

@@ -162,12 +162,15 @@ def analyze_finding(
     component_weights: Mapping[str, float] | None = None,
     max_searches: int = 12,
     already_normalized: bool = False,
+    extra_evidence: list | None = None,
 ) -> dict[str, Any]:
     finding = record if already_normalized else normalize_finding(record, window_minutes=window_minutes)
     weights = dict(COMPONENT_WEIGHTS)
     if component_weights:
         weights.update({k: float(v) for k, v in component_weights.items() if k in weights})
     evidence = collect_observed_evidence(finding)
+    if extra_evidence:
+        evidence = list(evidence) + list(extra_evidence)
     searches = recommend_searches(finding, window_minutes=window_minutes, max_searches=max_searches)
 
     components = {
