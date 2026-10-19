@@ -336,8 +336,12 @@ class DashboardXmlTests(unittest.TestCase):
         from xml.etree.ElementTree import parse
 
         views = os.path.join(APP, "default", "data", "ui", "views")
-        for name in ("judge_manager.xml", "agent_ops.xml", "finding_workbench.xml"):
+        for name in ("judge_manager.xml", "agent_ops.xml", "finding_workbench.xml", "overview.xml"):
             parse(os.path.join(views, name))
+            if name == "overview.xml":
+                text = open(os.path.join(views, name), encoding="utf-8").read()
+                self.assertNotIn('match(investigation_required,"$decision$")', text)
+                self.assertIn('"$decision$"="*" OR investigation_required="$decision$"', text)
 
 
 if __name__ == "__main__":

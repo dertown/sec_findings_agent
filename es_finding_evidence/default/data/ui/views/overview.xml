@@ -28,7 +28,7 @@
       <single>
         <title>Investigation required</title>
         <search>
-          <query>| loadfindings mode=$mode$ limit=$limit$ | where match(investigation_required,"$decision$") | stats count(eval(investigation_required="Yes")) as count</query>
+          <query>| loadfindings mode=$mode$ limit=$limit$ | where "$decision$"="*" OR investigation_required="$decision$" | stats count(eval(investigation_required="Yes")) as count</query>
         </search>
         <option name="colorBy">value</option>
         <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
@@ -41,7 +41,7 @@
       <single>
         <title>Analyst review</title>
         <search>
-          <query>| loadfindings mode=$mode$ limit=$limit$ | where match(investigation_required,"$decision$") | stats count(eval(investigation_required="Review")) as count</query>
+          <query>| loadfindings mode=$mode$ limit=$limit$ | where "$decision$"="*" OR investigation_required="$decision$" | stats count(eval(investigation_required="Review")) as count</query>
         </search>
         <option name="underLabel">REVIEW</option>
         <option name="colorBy">value</option>
@@ -54,7 +54,7 @@
       <single>
         <title>No follow-up</title>
         <search>
-          <query>| loadfindings mode=$mode$ limit=$limit$ | where match(investigation_required,"$decision$") | stats count(eval(investigation_required="No")) as count</query>
+          <query>| loadfindings mode=$mode$ limit=$limit$ | where "$decision$"="*" OR investigation_required="$decision$" | stats count(eval(investigation_required="No")) as count</query>
         </search>
         <option name="underLabel">NO</option>
       </single>
@@ -63,7 +63,7 @@
       <single>
         <title>Average follow-up score</title>
         <search>
-          <query>| loadfindings mode=$mode$ limit=$limit$ | where match(investigation_required,"$decision$") | stats avg(followup_score) as score | eval score=round(score,1)</query>
+          <query>| loadfindings mode=$mode$ limit=$limit$ | where "$decision$"="*" OR investigation_required="$decision$" | stats avg(followup_score) as score | eval score=round(score,1)</query>
         </search>
         <option name="underLabel">0-100</option>
         <option name="colorBy">value</option>
@@ -78,7 +78,7 @@
       <chart>
         <title>Follow-up score distribution</title>
         <search>
-          <query>| loadfindings mode=$mode$ limit=$limit$ | where match(investigation_required,"$decision$") | eval bucket=case(followup_score&lt;30,"0-29",followup_score&lt;50,"30-49",followup_score&lt;75,"50-74",true(),"75-100") | stats count by bucket | sort bucket</query>
+          <query>| loadfindings mode=$mode$ limit=$limit$ | where "$decision$"="*" OR investigation_required="$decision$" | eval bucket=case(followup_score&lt;30,"0-29",followup_score&lt;50,"30-49",followup_score&lt;75,"50-74",true(),"75-100") | stats count by bucket | sort bucket</query>
         </search>
         <option name="charting.chart">column</option>
         <option name="charting.axisTitleX.text">Score band</option>
@@ -90,7 +90,7 @@
       <chart>
         <title>Triage agent dispositions</title>
         <search>
-          <query>| loadfindings mode=$mode$ limit=$limit$ | where match(investigation_required,"$decision$") | eval triage_disposition=if(triage_present=0,"not_run",triage_disposition) | stats count by triage_disposition</query>
+          <query>| loadfindings mode=$mode$ limit=$limit$ | where "$decision$"="*" OR investigation_required="$decision$" | eval triage_disposition=if(triage_present=0,"not_run",triage_disposition) | stats count by triage_disposition</query>
         </search>
         <option name="charting.chart">pie</option>
       </chart>
@@ -101,7 +101,7 @@
       <table>
         <title>Scored findings — click a row to open the workbench</title>
         <search>
-          <query>| loadfindings mode=$mode$ limit=$limit$ | where match(investigation_required,"$decision$") | sort - followup_score | table followup_score, investigation_required, finding_id, title, urgency, triage_disposition, triage_confidence, evidence_net_weight, recommended_search_count, owner, status, user, src, dest</query>
+          <query>| loadfindings mode=$mode$ limit=$limit$ | where "$decision$"="*" OR investigation_required="$decision$" | sort - followup_score | table followup_score, investigation_required, finding_id, title, urgency, triage_disposition, triage_confidence, evidence_net_weight, recommended_search_count, owner, status, user, src, dest</query>
         </search>
         <option name="count">20</option>
         <option name="drilldown">row</option>
